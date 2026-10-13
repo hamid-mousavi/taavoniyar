@@ -1,7 +1,7 @@
 import React from 'react';
 import { Building2, Check, Globe, Shield, X, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { seedCooperatives } from '../../data/seedData';
+import { dataService } from '../../services/dataService';
 import { toPersianDigits } from '../../utils/persian';
 
 interface TenantSwitcherModalProps {
@@ -12,7 +12,9 @@ interface TenantSwitcherModalProps {
 export const TenantSwitcherModal: React.FC<TenantSwitcherModalProps> = ({ isOpen, onClose }) => {
   const { session, switchTenant } = useAuth();
 
-  if (!isOpen || !session) return null;
+  if (!isOpen || !session || !session.isGlobalSuperAdmin) return null;
+
+  const cooperatives = dataService.getAllCooperatives();
 
   const handleSelect = (coopId: string | null) => {
     switchTenant(coopId);
@@ -75,7 +77,7 @@ export const TenantSwitcherModal: React.FC<TenantSwitcherModalProps> = ({ isOpen
           )}
 
           {/* تعاونی‌های اختصاصی */}
-          {seedCooperatives.map((coop) => {
+          {cooperatives.map((coop) => {
             const isSelected = session.activeCooperative?.id === coop.id;
             // بررسی اینکه آیا کاربر عضو یا مدیر این تعاونی است (یا مدیر کل است)
             const hasAccess = session.isGlobalSuperAdmin || session.memberships.some(m => m.cooperativeId === coop.id);

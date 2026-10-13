@@ -13,8 +13,8 @@ RUN apk add --no-cache libc6-compat
 # کپی فایلهای وابستگی
 COPY package*.json ./
 
-# نصب پکیج‌ها
-RUN npm install
+# نصب پکیج‌ها با سازگاری peer dependencies
+RUN npm install --legacy-peer-deps
 
 # کپی کل سورس کد
 COPY . .

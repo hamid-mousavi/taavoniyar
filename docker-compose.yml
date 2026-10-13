@@ -10,8 +10,6 @@
 #   کل استک:    docker compose up --build -d
 # =========================================================================
 
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine

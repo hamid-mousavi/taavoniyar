@@ -8,7 +8,22 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+
+function getPort(): number {
+  const portArgIndex = process.argv.indexOf('--port');
+  if (portArgIndex !== -1 && process.argv[portArgIndex + 1]) {
+    return parseInt(process.argv[portArgIndex + 1], 10);
+  }
+  if (process.env.APP_PORT) {
+    return parseInt(process.env.APP_PORT, 10);
+  }
+  if (process.env.PORT && process.env.PORT !== '8080') {
+    return parseInt(process.env.PORT, 10);
+  }
+  return 3000;
+}
+
+const PORT = getPort();
 const isProd = process.env.NODE_ENV === 'production';
 
 app.use(express.json({ limit: '10mb' }));
@@ -733,21 +748,78 @@ app.post('/api/db/sync-all', async (req: Request, res: Response) => {
 });
 
 // -------------------------------------------------------------
+// اندپوینت اطلاعات کاربر مدیر ارشد سامانه از متغیرهای محیطی
+// -------------------------------------------------------------
+app.get('/api/admin/info', (req: Request, res: Response) => {
+  const adminMobile = (process.env.ADMIN_MOBILE || process.env.VITE_ADMIN_MOBILE || '09120000000').trim();
+  const adminFullName = (process.env.ADMIN_FULL_NAME || process.env.VITE_ADMIN_FULL_NAME || 'مدیر ارشد سامانه').trim();
+  const adminNationalCode = (process.env.ADMIN_NATIONAL_CODE || process.env.VITE_ADMIN_NATIONAL_CODE || '0010350829').trim();
+  return res.json({
+    adminMobile,
+    adminFullName,
+    adminNationalCode
+  });
+});
+
+// -------------------------------------------------------------
 // اندپوینت‌های تحلیل هوشمند مالی با Groq AI
 // -------------------------------------------------------------
 
-app.get('/api/ai/groq-status', (req: Request, res: Response) => {
-  const hasEnvKey = Boolean(process.env.GROQ_API_KEY && process.env.GROQ_API_KEY.trim());
+app.get('/api/ai/groq-status', async (req: Request, res: Response) => {
+  const apiKey = (process.env.GROQ_API_KEY || '').trim();
+  const hasEnvKey = Boolean(apiKey);
+
+  let activeModels = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b', 'allam-2-7b'];
+
+  if (hasEnvKey) {
+    try {
+      const groqRes = await fetch('https://api.groq.com/openai/v1/models', {
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      });
+      if (groqRes.ok) {
+        const data = await groqRes.json();
+        if (Array.isArray(data.data)) {
+          const chatOnly = data.data
+            .map((m: any) => m.id)
+            .filter((id: string) => 
+              !id.includes('whisper') && 
+              !id.includes('prompt-guard') && 
+              !id.includes('orpheus') && 
+              !id.includes('safeguard')
+            );
+          if (chatOnly.length > 0) {
+            // اولویت‌بندی مدل‌های قدرتمند چت و استدلال مالی
+            const priority = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b', 'allam-2-7b'];
+            chatOnly.sort((a: string, b: string) => {
+              const ia = priority.indexOf(a);
+              const ib = priority.indexOf(b);
+              if (ia !== -1 && ib !== -1) return ia - ib;
+              if (ia !== -1) return -1;
+              if (ib !== -1) return 1;
+              return 0;
+            });
+            activeModels = chatOnly;
+          }
+        }
+      }
+    } catch {
+      // استفاده از مقادیر پیش‌فرض
+    }
+  }
+
+  const defaultModel = activeModels.find(m => m === 'openai/gpt-oss-120b') || activeModels[0] || 'openai/gpt-oss-120b';
+
   return res.json({
     configured: hasEnvKey,
     source: hasEnvKey ? 'GROQ_API_KEY (Secret)' : 'none',
-    availableModels: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant']
+    availableModels: activeModels,
+    defaultModel
   });
 });
 
 app.post('/api/ai/financial-analysis', async (req: Request, res: Response) => {
   try {
-    const { cooperativeName, financialStats, customPrompt, groqApiKey, model = 'llama-3.3-70b-versatile' } = req.body;
+    const { cooperativeName, financialStats, customPrompt, groqApiKey, model } = req.body;
     const apiKey = (process.env.GROQ_API_KEY || groqApiKey || '').trim();
 
     if (!apiKey) {
@@ -789,29 +861,61 @@ ${customPrompt ? `نکته یا سوال خاص مدیر: ${customPrompt}` : ''}
 
 لطفاً تحلیل کامل هوشمند را در قالب شیء JSON طبق فرمت تعیین‌شده ارائه نمایید.`;
 
-    const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage }
-        ],
-        temperature: 0.3,
-        response_format: { type: 'json_object' }
-      })
-    });
+    // فهرستی از مدل‌های قابل استفاده به ترتیب اولویت جهت جلوگیری از خطای 404
+    const candidateModels = [
+      model,
+      'openai/gpt-oss-120b',
+      'openai/gpt-oss-20b',
+      'qwen/qwen3.8-27b',
+      'allam-2-7b',
+      'llama-3.3-70b-versatile'
+    ].filter(Boolean);
 
-    if (!groqResponse.ok) {
-      const errText = await groqResponse.text();
-      return res.status(groqResponse.status).json({
+    let groqResponse: any = null;
+    let selectedModel = '';
+
+    for (const m of candidateModels) {
+      const resAttempt = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: m,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMessage }
+          ],
+          temperature: 0.3,
+          response_format: { type: 'json_object' }
+        })
+      });
+
+      if (resAttempt.ok) {
+        groqResponse = resAttempt;
+        selectedModel = m;
+        break;
+      } else {
+        const errJson = await resAttempt.json().catch(() => ({}));
+        // اگر خطا به علت عدم دسترسی یا ناموجود بودن مدل بود، مدل بعدی تست می‌شود
+        if (errJson?.error?.code === 'model_not_found' || resAttempt.status === 404) {
+          continue;
+        }
+        // اگر خطا مربوط به اعتبارسنجی کلید یا موارد دیگر بود، همان را گزارش کن
+        return res.status(resAttempt.status).json({
+          success: false,
+          code: 'GROQ_API_ERROR',
+          message: `خطای ارتباط با سرور Groq (${resAttempt.status}): ${errJson?.error?.message || 'خطا در مدل'}`
+        });
+      }
+    }
+
+    if (!groqResponse) {
+      return res.status(500).json({
         success: false,
-        code: 'GROQ_API_ERROR',
-        message: `خطای ارتباط با سرور Groq (${groqResponse.status}): ${errText}`
+        code: 'GROQ_MODEL_ERROR',
+        message: 'هیچ مدل فعالی در حساب کاربری Groq برای انجام این تحلیل یافت نشد.'
       });
     }
 
@@ -836,7 +940,7 @@ ${customPrompt ? `نکته یا سوال خاص مدیر: ${customPrompt}` : ''}
     return res.json({
       success: true,
       data: parsedJson,
-      modelUsed: model,
+      modelUsed: selectedModel,
       usage: data.usage
     });
   } catch (error: any) {

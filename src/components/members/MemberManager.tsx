@@ -27,8 +27,7 @@ import {
   toPersianDigits, 
   isValidIranianNationalCode, 
   isValidIranianMobile,
-  formatJalaliDate,
-  SAMPLE_VALID_NATIONAL_CODES
+  formatJalaliDate
 } from '../../utils/persian';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { dbClient } from '../../lib/dbClient';
@@ -83,9 +82,6 @@ export const MemberManager: React.FC = () => {
     membershipNumber: '',
     isActive: true
   });
-
-  // حالت تست و گذر از الگوریتم کد ملی برای جلوگیری از قفل شدن دکمه
-  const [allowBypassTestMode, setAllowBypassTestMode] = useState<boolean>(false);
 
   const allCoops = dataService.getAllCooperatives();
 
@@ -166,8 +162,7 @@ export const MemberManager: React.FC = () => {
         mobile: createFormData.mobile,
         nationalCode: createFormData.nationalCode,
         fatherName: createFormData.fatherName,
-        role: createFormData.role,
-        allowBypassMod11: allowBypassTestMode
+        role: createFormData.role
       }, {
         id: session.user.id,
         fullName: session.user.fullName,
@@ -294,7 +289,7 @@ export const MemberManager: React.FC = () => {
 
   // اعتبارسنجی زنده در فرم
   const isCreateMobileValid = isValidIranianMobile(createFormData.mobile);
-  const isCreateNationalCodeValid = isValidIranianNationalCode(createFormData.nationalCode, allowBypassTestMode);
+  const isCreateNationalCodeValid = isValidIranianNationalCode(createFormData.nationalCode);
 
   const filteredMembers = members.filter(({ user, membership }) => {
     const term = searchTerm.toLowerCase();
@@ -616,21 +611,36 @@ export const MemberManager: React.FC = () => {
                 </div>
               )}
 
-              <div className="space-y-1.5">
-                <label className="font-bold text-slate-700">تعاونی مسکن مقصد *</label>
-                <select
-                  required
-                  value={createFormData.cooperativeId}
-                  onChange={e => setCreateFormData({ ...createFormData, cooperativeId: e.target.value })}
-                  className="w-full p-3 rounded-xl border border-slate-300 focus:border-emerald-600 outline-none bg-white"
-                >
-                  {allCoops.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.projectName})
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* انتخاب تعاونی مسکن */}
+              {session?.isGlobalSuperAdmin ? (
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">تعاونی مسکن مقصد *</label>
+                  <select
+                    required
+                    value={createFormData.cooperativeId}
+                    onChange={e => setCreateFormData({ ...createFormData, cooperativeId: e.target.value })}
+                    className="w-full p-3 rounded-xl border border-slate-300 focus:border-emerald-600 outline-none bg-white"
+                  >
+                    {allCoops.length === 0 ? (
+                      <option value="">ابتدا یک تعاونی مسکن ایجاد فرمایید</option>
+                    ) : (
+                      allCoops.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} ({c.projectName})
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+              ) : session?.activeCooperative ? (
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-700">تعاونی مسکن تحت مدیریت شما</label>
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-bold text-xs flex items-center justify-between">
+                    <span>{session.activeCooperative.name} ({session.activeCooperative.projectName})</span>
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold">پروژه فعال</span>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
@@ -687,7 +697,7 @@ export const MemberManager: React.FC = () => {
                     <label className="font-bold text-slate-700">کد ملی (۱۰ رقم) *</label>
                     {createFormData.nationalCode && (
                       <span className={`text-[10px] font-bold ${isCreateNationalCodeValid ? 'text-emerald-600' : 'text-rose-500'}`}>
-                        {isCreateNationalCodeValid ? (allowBypassTestMode ? 'پذیرفته با حالت تست ✓' : 'معتبر ✓') : 'الگوریتم نامعتبر'}
+                        {isCreateNationalCodeValid ? 'معتبر ✓' : 'الگوریتم نامعتبر'}
                       </span>
                     )}
                   </div>
@@ -705,41 +715,10 @@ export const MemberManager: React.FC = () => {
                         : 'border-slate-300 focus:border-emerald-600'
                     }`}
                   />
-                  {/* کدهای نمونه معتبر جهت تست سریع */}
-                  <div className="pt-1 space-y-1">
-                    <span className="text-[10px] text-slate-500 font-medium block">کدهای ملی نمونه معتبر (کلیک برای درج خودکار):</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {SAMPLE_VALID_NATIONAL_CODES.map((s) => (
-                        <button
-                          key={s.code}
-                          type="button"
-                          onClick={() => setCreateFormData({ ...createFormData, nationalCode: s.code })}
-                          className="px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-mono border border-emerald-200 transition-colors cursor-pointer"
-                          title={s.label}
-                        >
-                          {s.code}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    کد ملی معتبر ۱۰ رقمی متقاضی (صفرهای ابتدایی به طور خودکار تنظیم می‌شوند).
+                  </p>
                 </div>
-              </div>
-
-              {/* سوئیچ حالت تست / ثبت آزاد */}
-              <div className="flex items-center justify-between p-3 rounded-2xl bg-amber-50 border border-amber-200/80">
-                <div className="space-y-0.5 text-right">
-                  <span className="text-xs font-bold text-amber-900 block">حالت ثبت تستی و آزاد (Bypass Mod 11)</span>
-                  <span className="text-[10px] text-amber-700 block">فعال‌سازی برای محیط توسعه یا کدهای ملی تستی تا دکمه ثبت هرگز قفل نشود</span>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={allowBypassTestMode}
-                    onChange={e => setAllowBypassTestMode(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
-                </label>
               </div>
 
               <div className="space-y-1.5">
@@ -750,8 +729,10 @@ export const MemberManager: React.FC = () => {
                   className="w-full p-3 rounded-xl border border-slate-300 focus:border-emerald-600 outline-none bg-white"
                 >
                   <option value="MEMBER">عضو عادی تعاونی (خریدار واحد)</option>
-                  <option value="COOP_ADMIN">مدیر اجرایی تعاونی (دسترسی مدیریت)</option>
                   <option value="ACCOUNTANT">حسابدار تعاونی</option>
+                  {session?.isGlobalSuperAdmin && (
+                    <option value="COOP_ADMIN">مدیر اجرایی تعاونی (دسترسی مدیریت تعاونی)</option>
+                  )}
                   {session?.isGlobalSuperAdmin && (
                     <option value="SUPER_ADMIN">مدیر ارشد سامانه</option>
                   )}
@@ -768,7 +749,7 @@ export const MemberManager: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={!createFormData.fullName || !isCreateMobileValid || (!allowBypassTestMode && !isCreateNationalCodeValid)}
+                  disabled={!createFormData.fullName || !isCreateMobileValid || !isCreateNationalCodeValid}
                   className="px-6 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold transition-all shadow-sm cursor-pointer"
                 >
                   ثبت نام قطعی عضو

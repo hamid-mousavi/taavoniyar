@@ -47,18 +47,25 @@ export const UserMenu: React.FC<UserMenuProps> = ({ onOpenLogin }) => {
       <div className="relative">
         <div className="flex items-center gap-2">
           
-          {/* دکمه انتخاب تعاونی فعال */}
-          <button
-            onClick={() => setIsSwitcherOpen(true)}
-            className="hidden sm:flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 transition-colors cursor-pointer"
-            title="تغییر تعاونی یا پروژه فعال"
-          >
-            <Building2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span className="max-w-[150px] truncate">
-              {session.activeCooperative ? session.activeCooperative.name : 'کلیه تعاونی‌ها'}
-            </span>
-            <ArrowLeftRight className="w-3 h-3 text-slate-400" />
-          </button>
+          {/* نمایش تعاونی فعال */}
+          {session.isGlobalSuperAdmin ? (
+            <button
+              onClick={() => setIsSwitcherOpen(true)}
+              className="hidden sm:flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 transition-colors cursor-pointer"
+              title="تغییر تعاونی یا پروژه فعال (مخصوص مدیر ارشد)"
+            >
+              <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="max-w-[150px] truncate">
+                {session.activeCooperative ? session.activeCooperative.name : 'دید سراسری (همه تعاونی‌ها)'}
+              </span>
+              <ArrowLeftRight className="w-3 h-3 text-slate-400" />
+            </button>
+          ) : session.activeCooperative ? (
+            <div className="hidden sm:flex items-center gap-2 bg-slate-100 text-slate-800 px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-200">
+              <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="max-w-[150px] truncate">{session.activeCooperative.name}</span>
+            </div>
+          ) : null}
 
           {/* اطلاعات کاربر و منوی پروفایل */}
           <button

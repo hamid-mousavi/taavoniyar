@@ -1,14 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Cooperative, Membership, UserRole, AuditLog } from '../types/database';
-import { 
-  seedUsers, 
-  seedCooperatives, 
-  seedMemberships, 
-  seedAuditLogs 
-} from '../data/seedData';
+import { dataService } from '../services/dataService';
 import { isValidIranianMobile } from '../utils/persian';
 
-interface AuthSession {
+export interface AuthSession {
   user: User;
   memberships: Membership[];
   activeMembership: Membership | null;
@@ -26,16 +21,16 @@ interface AuthContextType {
   otpExpiresAt: number | null;
   isLoading: boolean;
   error: string | null;
+  adminMobile: string;
   requestOtp: (mobile: string) => Promise<{ success: boolean; message: string; code?: string }>;
   verifyOtp: (mobile: string, code: string) => Promise<{ success: boolean; message: string }>;
   switchTenant: (cooperativeId: string | null) => void;
   logout: () => void;
-  quickLoginAs: (userId: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'maskanyar_auth_session';
+const STORAGE_KEY = 'maskanyar_auth_session_v5';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<AuthSession | null>(null);
@@ -44,15 +39,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [otpExpiresAt, setOtpExpiresAt] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [adminMobile, setAdminMobile] = useState<string>('09120000000');
 
-  // بازیابی سشن ذخیره شده از localStorage در هنگام بارگذاری
+  // واکشی مشخصات ادمین از سرور یا متغیرهای کلاینت
+  useEffect(() => {
+    fetch('/api/admin/info')
+      .then(r => r.json())
+      .then(d => {
+        if (d.adminMobile) setAdminMobile(d.adminMobile);
+      })
+      .catch(() => {
+        const envMob = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_ADMIN_MOBILE) || '09120000000';
+        setAdminMobile(envMob);
+      });
+  }, []);
+
+  // بازیابی سشن ذخیره شده از localStorage
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        const parsed = JSON.parse(saved);
-        // بررسی معتبر بودن کاربر
-        const userExists = seedUsers.find(u => u.id === parsed.user.id);
+        const parsed: AuthSession = JSON.parse(saved);
+        const users = dataService.getAllUsers();
+        const userExists = users.find(u => u.id === parsed.user.id && !u.isDeleted);
         if (userExists) {
           setSession(parsed);
         } else {
@@ -64,7 +73,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // ذخیره سشن در localStorage
   const saveSession = (newSession: AuthSession | null) => {
     setSession(newSession);
     if (newSession) {
@@ -74,46 +82,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // درخواست ارسال کد یکبار مصرف پیامکی
-  const requestOtp = async (mobile: string): Promise<{ success: boolean; message: string; code?: string }> => {
+  // درخواست کد یکبار مصرف پیامکی
+  const requestOtp = async (mobileInput: string): Promise<{ success: boolean; message: string; code?: string }> => {
     setIsLoading(true);
     setError(null);
 
-    // تاخیر شبیه‌سازی شبکه
-    await new Promise(resolve => setTimeout(resolve, 600));
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-    // اعتبارسنجی شماره موبایل
-    if (!isValidIranianMobile(mobile)) {
+    const cleanMobile = mobileInput.replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 1776)).trim();
+
+    if (!isValidIranianMobile(cleanMobile)) {
       setIsLoading(false);
       const errMsg = 'شماره موبایل وارد شده نامعتبر است. فرمت صحیح: ۰۹۱۲۳۴۵۶۷۸۹';
       setError(errMsg);
       return { success: false, message: errMsg };
     }
 
-    // تولید کد تصادفی ۵ رقمی (برای تست، اگر شماره در سید باشد یک کد مشخص‌تر هم می‌توان داد)
-    const code = Math.floor(10000 + Math.random() * 90000).toString();
-    const expiresAt = Date.now() + 120 * 1000; // ۲ دقیقه اعتبار
+    // بررسی وجود کاربر در دیتابیس
+    const allUsers = dataService.getAllUsers();
+    const user = allUsers.find(u => u.mobile === cleanMobile && !u.isDeleted);
 
-    setOtpSentToMobile(mobile);
+    if (!user) {
+      setIsLoading(false);
+      const errMsg = 'کاربری با این شماره موبایل در سامانه ثبت نشده است. لطفاً با مدیر تعاونی یا ادمین کل تماس حاصل فرمایید.';
+      setError(errMsg);
+      return { success: false, message: errMsg };
+    }
+
+    // تولید کد ۵ رقمی تصادفی
+    const code = Math.floor(10000 + Math.random() * 90000).toString();
+    const expiresAt = Date.now() + 120 * 1000;
+
+    setOtpSentToMobile(cleanMobile);
     setSimulatedOtpCode(code);
     setOtpExpiresAt(expiresAt);
     setIsLoading(false);
 
     return {
       success: true,
-      message: `کد تایید با موفقیت برای شماره ${mobile} پیامک شد.`,
+      message: `کد تایید ورود برای شماره ${cleanMobile} پیامک شد.`,
       code
     };
   };
 
-  // تایید کد پیامکی و ساخت نشست چندمستأجری
-  const verifyOtp = async (mobile: string, code: string): Promise<{ success: boolean; message: string }> => {
+  // تایید کد پیامکی و ساخت نشست چندمستأجری با تفکیک دقیق دسترسی
+  const verifyOtp = async (mobileInput: string, codeInput: string): Promise<{ success: boolean; message: string }> => {
     setIsLoading(true);
     setError(null);
 
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 400));
 
-    if (!otpSentToMobile || otpSentToMobile !== mobile) {
+    const cleanMobile = mobileInput.replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 1776)).trim();
+    const cleanCode = codeInput.replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 1776)).trim();
+
+    if (!otpSentToMobile || otpSentToMobile !== cleanMobile) {
       setIsLoading(false);
       const msg = 'ابتدا شماره موبایل خود را وارد کرده و درخواست کد نمایید.';
       setError(msg);
@@ -122,33 +144,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (otpExpiresAt && Date.now() > otpExpiresAt) {
       setIsLoading(false);
-      const msg = 'کد تایید منقضی شده است. لطفاً مجدداً درخواست ارسال کد نمایید.';
+      const msg = 'کد تایید منقضی شده است. مجدداً درخواست ارسال کد نمایید.';
       setError(msg);
       return { success: false, message: msg };
     }
 
-    // بررسی صحت کد پیامکی (کد شبیه‌سازی‌شده یا کد عمومی مستر 12345 برای راحتی تست)
-    if (code !== simulatedOtpCode && code !== '12345') {
+    // اعتبارسنجی کد دریافتی (یا مستر کد ۱۲۳۴۵ برای تست سریع)
+    if (cleanCode !== simulatedOtpCode && cleanCode !== '12345') {
       setIsLoading(false);
-      const msg = 'کد وارد شده صحیح نمی‌باشد. لطفاً مجدداً بررسی فرمایید.';
+      const msg = 'کد پیامک وارد شده صحیح نمی‌باشد.';
       setError(msg);
       return { success: false, message: msg };
     }
 
-    // یافتن کاربر در دیتابیس
-    const user = seedUsers.find(u => u.mobile === mobile);
+    const allUsers = dataService.getAllUsers();
+    const user = allUsers.find(u => u.mobile === cleanMobile && !u.isDeleted);
+
     if (!user) {
       setIsLoading(false);
-      const msg = 'کاربری با این شماره موبایل در سیستم ثبت نشده است. با مدیر تعاونی تماس بگیرید.';
+      const msg = 'کاربر در سامانه یافت نشد.';
       setError(msg);
       return { success: false, message: msg };
     }
 
-    // استخراج کلیه عضویت‌ها و نقش‌های کاربر
-    const userMemberships = seedMemberships.filter(m => m.userId === user.id && m.isActive);
-    const isSuperAdmin = userMemberships.some(m => m.role === 'SUPER_ADMIN') || user.id === 'user-superadmin';
+    const allMemberships = dataService.getAllMemberships();
+    const allCooperatives = dataService.getAllCooperatives();
 
-    // تعیین تعاونی پیش‌فرض و نقش اولیه
+    const userMemberships = allMemberships.filter(m => m.userId === user.id && m.isActive && !m.isDeleted);
+    
+    // آیا مدیر ارشد کل سامانه است؟
+    const isSuperAdmin = userMemberships.some(m => m.role === 'SUPER_ADMIN') || 
+      user.id === 'user-superadmin' || 
+      user.mobile === adminMobile;
+
     let initialMembership: Membership | null = null;
     let initialCooperative: Cooperative | null = null;
     let initialRole: UserRole = 'MEMBER';
@@ -156,11 +184,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isSuperAdmin) {
       initialRole = 'SUPER_ADMIN';
       initialMembership = userMemberships[0] || null;
-      initialCooperative = null; // مدیر کل در حالت کلی همه را می‌بیند
+      initialCooperative = null; // مدیر ارشد دید سراسری دارد
     } else if (userMemberships.length > 0) {
+      // مدیر تعاونی یا عضو عادی
       initialMembership = userMemberships[0];
       initialRole = initialMembership.role;
-      initialCooperative = seedCooperatives.find(c => c.id === initialMembership!.cooperativeId) || null;
+      initialCooperative = allCooperatives.find(c => c.id === initialMembership!.cooperativeId && !c.isDeleted) || null;
     }
 
     const newSession: AuthSession = {
@@ -175,9 +204,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     saveSession(newSession);
 
-    // ثبت لاگ امنیتی در audit_logs
-    const newLog: AuditLog = {
-      id: `log-login-${Date.now()}`,
+    // ثبت لاگ ورود
+    dataService.addAuditLog({
       cooperativeId: initialCooperative?.id || null,
       userId: user.id,
       userFullName: user.fullName,
@@ -185,13 +213,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       action: 'LOGIN_OTP',
       entityType: 'USER',
       entityId: user.id,
-      description: `ورود موفق کاربر با رمز یکبارمصرف پیامکی (OTP) با نقش ${initialRole}`,
-      ipAddress: '188.253.30.12',
-      timestamp: new Date().toISOString()
-    };
-    seedAuditLogs.unshift(newLog);
+      description: `ورود موفق کاربر «${user.fullName}» با نقش «${initialRole}» از طریق رمز یکبارمصرف پیامکی`,
+      ipAddress: '127.0.0.1'
+    });
 
-    // پاکسازی وضعیت OTP
     setOtpSentToMobile(null);
     setSimulatedOtpCode(null);
     setOtpExpiresAt(null);
@@ -200,12 +225,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: true, message: 'ورود موفقیت‌آمیز بود.' };
   };
 
-  // تغییر تعاونی یا نقش فعال در نشست چندمستأجری (Tenant Switching)
+  // سوییچ تعاونی منحصراً برای سوپر ادمین سامانه
   const switchTenant = (cooperativeId: string | null) => {
     if (!session) return;
 
-    if (cooperativeId === null && session.isGlobalSuperAdmin) {
-      // مدیر کل به حالت دید سراسری برمی‌گردد
+    // فقط مدیر ارشد اجازه تغییر تعاونی دارد
+    if (!session.isGlobalSuperAdmin) {
+      console.warn('مدیر تعاونی یا عضو عادی حق تغییر تعاونی را ندارد.');
+      return;
+    }
+
+    if (cooperativeId === null) {
       const updated: AuthSession = {
         ...session,
         activeCooperative: null,
@@ -216,93 +246,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    const targetCoop = seedCooperatives.find(c => c.id === cooperativeId);
+    const allCooperatives = dataService.getAllCooperatives();
+    const targetCoop = allCooperatives.find(c => c.id === cooperativeId && !c.isDeleted);
     if (!targetCoop) return;
-
-    // بررسی دسترسی کاربر به این تعاونی
-    if (session.isGlobalSuperAdmin) {
-      const updated: AuthSession = {
-        ...session,
-        activeCooperative: targetCoop,
-        activeRole: 'SUPER_ADMIN',
-      };
-      saveSession(updated);
-      return;
-    }
-
-    const membershipInCoop = session.memberships.find(m => m.cooperativeId === cooperativeId);
-    if (!membershipInCoop) {
-      setError('شما عضویت فعالی در این تعاونی مسکن ندارید.');
-      return;
-    }
 
     const updated: AuthSession = {
       ...session,
       activeCooperative: targetCoop,
-      activeMembership: membershipInCoop,
-      activeRole: membershipInCoop.role
+      activeRole: 'SUPER_ADMIN'
     };
     saveSession(updated);
   };
 
-  // خروج از حساب کاربری
   const logout = () => {
+    if (session) {
+      dataService.addAuditLog({
+        cooperativeId: session.activeCooperative?.id || null,
+        userId: session.user.id,
+        userFullName: session.user.fullName,
+        userRole: session.activeRole,
+        action: 'UPDATE',
+        entityType: 'USER',
+        entityId: session.user.id,
+        description: `خروج کاربر «${session.user.fullName}» از سامانه`
+      });
+    }
     saveSession(null);
     setOtpSentToMobile(null);
     setSimulatedOtpCode(null);
     setOtpExpiresAt(null);
     setError(null);
-  };
-
-  // لاگین سریع با یک کلیک جهت تست و ارزیابی آسان توسط کاربر
-  const quickLoginAs = (userId: string) => {
-    const user = seedUsers.find(u => u.id === userId);
-    if (!user) return;
-
-    const userMemberships = seedMemberships.filter(m => m.userId === user.id && m.isActive);
-    const isSuperAdmin = userMemberships.some(m => m.role === 'SUPER_ADMIN') || user.id === 'user-superadmin';
-
-    let initialMembership: Membership | null = null;
-    let initialCooperative: Cooperative | null = null;
-    let initialRole: UserRole = 'MEMBER';
-
-    if (isSuperAdmin) {
-      initialRole = 'SUPER_ADMIN';
-      initialMembership = userMemberships[0] || null;
-      initialCooperative = null;
-    } else if (userMemberships.length > 0) {
-      initialMembership = userMemberships[0];
-      initialRole = initialMembership.role;
-      initialCooperative = seedCooperatives.find(c => c.id === initialMembership!.cooperativeId) || null;
-    }
-
-    const newSession: AuthSession = {
-      user,
-      memberships: userMemberships,
-      activeMembership: initialMembership,
-      activeCooperative: initialCooperative,
-      activeRole: initialRole,
-      isGlobalSuperAdmin: isSuperAdmin,
-      token: `msk_quick_${user.id}_${Date.now()}`
-    };
-
-    saveSession(newSession);
-
-    // ثبت لاگ
-    const newLog: AuditLog = {
-      id: `log-login-${Date.now()}`,
-      cooperativeId: initialCooperative?.id || null,
-      userId: user.id,
-      userFullName: user.fullName,
-      userRole: initialRole,
-      action: 'LOGIN_OTP',
-      entityType: 'USER',
-      entityId: user.id,
-      description: `ورود تستی سریع با نقش ${initialRole}`,
-      ipAddress: '127.0.0.1',
-      timestamp: new Date().toISOString()
-    };
-    seedAuditLogs.unshift(newLog);
   };
 
   return (
@@ -315,11 +288,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         otpExpiresAt,
         isLoading,
         error,
+        adminMobile,
         requestOtp,
         verifyOtp,
         switchTenant,
-        logout,
-        quickLoginAs
+        logout
       }}
     >
       {children}

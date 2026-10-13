@@ -49,7 +49,7 @@ export interface RecycleItem {
   details?: string;
 }
 
-const STORE_KEY_PREFIX = 'maskanyar_store_';
+const STORE_KEY_PREFIX = 'maskanyar_store_v5_';
 
 class DataService {
   private cooperatives: Cooperative[] = [];
@@ -84,6 +84,38 @@ class DataService {
       this.auditLogs = this.loadOrInit('auditLogs', seedAuditLogs);
       this.monthlyFees = this.loadOrInit('monthlyFees', seedMonthlyFees);
       this.customFeeCategories = this.loadOrInit('fee_categories', []);
+
+      // پاکسازی رکوردهای دمو قدیمی در صورتی که در مرورگر باقی مانده باشد
+      if (
+        this.users.some(u => u.id === 'user-admin-coop1' || u.id === 'user-member-1' || u.id === 'user-accountant-1') ||
+        this.cooperatives.some(c => c.id === 'coop-1' || c.id === 'coop-2')
+      ) {
+        this.resetToDefaults();
+      }
+
+      // اطمینان از وجود کاربر سوپر ادمین
+      if (!this.users.some(u => u.id === 'user-superadmin')) {
+        this.users.unshift(seedUsers[0]);
+        this.persist('users', this.users);
+      }
+
+      // همگام‌سازی شماره ادمین با متغیرهای محیطی سرور
+      if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+        fetch('/api/admin/info')
+          .then(r => r.json())
+          .then(info => {
+            if (info && info.adminMobile) {
+              const admin = this.users.find(u => u.id === 'user-superadmin');
+              if (admin && admin.mobile !== info.adminMobile) {
+                admin.mobile = info.adminMobile;
+                if (info.adminFullName) admin.fullName = info.adminFullName;
+                if (info.adminNationalCode) admin.nationalCode = info.adminNationalCode;
+                this.persist('users', this.users);
+              }
+            }
+          })
+          .catch(() => {});
+      }
     } catch {
       this.resetToDefaults();
     }
@@ -170,12 +202,20 @@ class DataService {
     this.receipts = [...seedReceipts];
     this.announcements = [...seedAnnouncements];
     this.auditLogs = [...seedAuditLogs];
+    this.monthlyFees = [...seedMonthlyFees];
+    this.customFeeCategories = [];
 
     [
       'cooperatives', 'users', 'memberships', 'units', 
       'installmentPlans', 'installmentItems', 'payments', 
-      'receipts', 'announcements', 'auditLogs'
-    ].forEach(k => localStorage.removeItem(STORE_KEY_PREFIX + k));
+      'receipts', 'announcements', 'auditLogs', 'monthlyFees', 'fee_categories'
+    ].forEach(k => {
+      try {
+        if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+          localStorage.removeItem(STORE_KEY_PREFIX + k);
+        }
+      } catch {}
+    });
 
     this.notifyListeners();
   }
@@ -480,6 +520,11 @@ class DataService {
     // اعتبارسنجی کانتکست
     if (executor.role === 'MEMBER') {
       throw new Error('اعضای عادی دسترسی لازم جهت ثبت عضو جدید را ندارند.');
+    }
+
+    // اگر اقدام‌کننده مدیر تعاونی است، فقط مجاز به ثبت عضو عادی یا حسابدار در تعاونی خود است
+    if (executor.role === 'COOP_ADMIN' && (params.role === 'COOP_ADMIN' || params.role === 'SUPER_ADMIN')) {
+      throw new Error('تنها مدیر ارشد سامانه مجاز به تعریف و انتصاب مدیران تعاونی است.');
     }
 
     const cleanMobile = params.mobile.replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 1776)).trim();
@@ -2074,7 +2119,7 @@ class DataService {
   }
 
   // ثبت لاگ
-  private addAuditLog(log: Omit<AuditLog, 'id' | 'timestamp'>) {
+  public addAuditLog(log: Omit<AuditLog, 'id' | 'timestamp'>) {
     const newLog: AuditLog = {
       ...log,
       id: `log-${Date.now()}-${Math.floor(Math.random() * 1000)}`,

@@ -41,9 +41,15 @@ export const FinancialGroqDashboard: React.FC = () => {
   const { session } = useAuth();
   const [groqConfigured, setGroqConfigured] = useState<boolean>(false);
   const [groqSource, setGroqSource] = useState<string>('');
-  const [fallbackKey, setFallbackKey] = useState<string>('');
-  const [selectedModel, setSelectedModel] = useState<string>('llama-3.3-70b-versatile');
+  const [availableModels, setAvailableModels] = useState<string[]>([
+    'openai/gpt-oss-120b',
+    'openai/gpt-oss-20b',
+    'qwen/qwen3.8-27b',
+    'allam-2-7b'
+  ]);
+  const [selectedModel, setSelectedModel] = useState<string>('openai/gpt-oss-120b');
   const [customPrompt, setCustomPrompt] = useState<string>('');
+  const [fallbackKey, setFallbackKey] = useState<string>('');
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [analysisResult, setAnalysisResult] = useState<AiAnalysisResult | null>(null);
@@ -84,6 +90,10 @@ export const FinancialGroqDashboard: React.FC = () => {
       .then(data => {
         setGroqConfigured(data.configured);
         setGroqSource(data.source);
+        if (Array.isArray(data.availableModels) && data.availableModels.length > 0) {
+          setAvailableModels(data.availableModels);
+          setSelectedModel(data.defaultModel || data.availableModels[0]);
+        }
       })
       .catch(() => {});
 
@@ -288,10 +298,13 @@ ${analysisResult.budgetForecast}
             <select
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
-              className="w-full p-2.5 rounded-xl border border-slate-300 bg-white font-mono outline-none"
+              className="w-full p-2.5 rounded-xl border border-slate-300 bg-white font-mono outline-none text-xs"
             >
-              <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile (دقیق‌ترین تحلیل سازمانی)</option>
-              <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant (فوق سریع و بلادرنگ)</option>
+              {availableModels.map(m => (
+                <option key={m} value={m}>
+                  {m} {m.includes('120b') ? '(تحلیل جامع سازمانی)' : m.includes('20b') ? '(سریع و بهینه)' : ''}
+                </option>
+              ))}
             </select>
           </div>
 

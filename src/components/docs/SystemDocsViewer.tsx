@@ -72,56 +72,34 @@ export const SystemDocsViewer: React.FC = () => {
         </div>
       </div>
 
-      {/* تب‌های انتخاب نقش */}
-      <div className="bg-white p-2 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap gap-2">
-        <button
-          onClick={() => setActiveDocTab('super_admin')}
-          className={`flex-1 min-w-[140px] px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-            activeDocTab === 'super_admin'
-              ? 'bg-purple-900 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <ShieldCheck className="w-4 h-4 text-purple-400" />
-          <span>مدیر ارشد سامانه (Super Admin)</span>
-        </button>
+      {/* تب‌های راهنما فقط متناسب با نقش کاربر */}
+      {session?.activeRole === 'SUPER_ADMIN' && (
+        <div className="bg-white p-2 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap gap-2">
+          <button
+            onClick={() => setActiveDocTab('super_admin')}
+            className={`flex-1 min-w-[140px] px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+              activeDocTab === 'super_admin'
+                ? 'bg-purple-900 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4 text-purple-400" />
+            <span>راهنمای مدیر ارشد سامانه (Super Admin)</span>
+          </button>
 
-        <button
-          onClick={() => setActiveDocTab('coop_admin')}
-          className={`flex-1 min-w-[140px] px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-            activeDocTab === 'coop_admin'
-              ? 'bg-amber-900 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <Building2 className="w-4 h-4 text-amber-400" />
-          <span>مدیر تعاونی مسکن (Coop Admin)</span>
-        </button>
-
-        <button
-          onClick={() => setActiveDocTab('member')}
-          className={`flex-1 min-w-[140px] px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-            activeDocTab === 'member'
-              ? 'bg-emerald-900 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <User className="w-4 h-4 text-emerald-400" />
-          <span>عضو و خریدار واحد (Member)</span>
-        </button>
-
-        <button
-          onClick={() => setActiveDocTab('docker')}
-          className={`flex-1 min-w-[140px] px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-            activeDocTab === 'docker'
-              ? 'bg-slate-900 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <Terminal className="w-4 h-4 text-emerald-400" />
-          <span>استقرار با داکر (PostgreSQL & VPS)</span>
-        </button>
-      </div>
+          <button
+            onClick={() => setActiveDocTab('docker')}
+            className={`flex-1 min-w-[140px] px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+              activeDocTab === 'docker'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Terminal className="w-4 h-4 text-emerald-400" />
+            <span>راهنمای استقرار با داکر (PostgreSQL & VPS)</span>
+          </button>
+        </div>
+      )}
 
       {/* محتوای راهنما بر اساس تب فعال */}
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-8 leading-relaxed text-slate-800">
@@ -215,12 +193,8 @@ export const SystemDocsViewer: React.FC = () => {
                   <span>ثبت عضو جدید و رفع خطای کد ملی</span>
                 </h4>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  هنگام ثبت عضو، سامانه کد ملی را با الگوریتم مخرج ۱۱ اعتبارسنجی می‌کند. اگر کدی صفرهای اولیه دارد، صفرهای آن حفظ می‌شوند. علاوه بر آن:
+                  هنگام ثبت عضو، سامانه کد ملی را طبق الگوریتم رسمی کشور (Mod 11) اعتبارسنجی می‌کند. صفرهای ابتدای کد ملی به صورت خودکار حفظ شده و ارقام فارسی نیز به صورت سیستمی تبدیل می‌شوند تا خطایی در ثبت عضو رخ ندهد.
                 </p>
-                <ul className="list-disc list-inside text-xs text-slate-600 space-y-1 pr-2">
-                  <li><strong>کدهای ملی نمونه معتبر:</strong> دکمه‌های درج سریع کد ملی برای راحتی در تست تعبیه شده‌اند.</li>
-                  <li><strong>حالت ثبت تستی و آزاد (Bypass Mod 11):</strong> با فعال‌سازی این کلید در فرم، اعتبارسنجی عبور کرده و دکمه ثبت هرگز قفل نمی‌شود.</li>
-                </ul>
               </div>
 
               {/* صدور شارژ و هزینه‌های جاری */}

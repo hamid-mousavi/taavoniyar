@@ -11,8 +11,6 @@ import {
   Layers, 
   Database, 
   ChevronDown,
-  Wrench,
-  Terminal,
   Activity,
   FileCode,
   ShieldCheck,
@@ -34,9 +32,7 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenLogin }) => {
   const todayJalali = formatJalaliDate(new Date(), false);
-  const { isAuthenticated, session } = useAuth();
-  const [isToolsDropdownOpen, setIsToolsDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const { session } = useAuth();
 
   const [isDbConnected, setIsDbConnected] = useState<boolean>(dbClient.isConnected() || isSupabaseConfigured());
 
@@ -48,42 +44,45 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenL
     return unsub;
   }, []);
 
-  // بستن منوی کشویی هنگام کلیک خارج از آن
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsToolsDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  const role = session?.activeRole || 'MEMBER';
 
-  // تب‌های عملیاتی و اصلی سامانه پروداکشن
-  const mainTabs = [
-    { id: 'dashboard', label: 'داشبورد', icon: LayoutDashboard },
-    { id: 'payments', label: 'امور مالی و پرداخت‌ها', icon: CreditCard },
-    { id: 'monthlyFees', label: 'شارژ و خدمات جاری', icon: Coins },
-    { id: 'installments', label: 'اقساط ساختمانی', icon: CalendarDays },
-    { id: 'units', label: 'واحدها و نقشه', icon: Home },
-    { id: 'members', label: 'اعضای تعاونی', icon: Users },
-    { id: 'cooperatives', label: 'پروژه‌ها و تعاونی‌ها', icon: Layers },
-    { id: 'aiDashboard', label: 'داشبورد هوش مصنوعی', icon: Sparkles },
-    { id: 'recycleBin', label: 'سطل بازیافت', icon: Trash2 },
-    { id: 'docs', label: 'راهنمای سامانه', icon: BookOpen },
-  ];
+  // تب‌های نقش‌محور پروداکشن (بدون ابزارهای اضافی تست و شبیه‌ساز)
+  let visibleTabs: { id: string; label: string; icon: React.ComponentType<{ className?: string }> }[] = [];
 
-  // ابزارهای سیستمی و دیتابیس (منوی کشویی مرتب)
-  const systemTools = [
-    { id: 'supabase', label: 'پایگاه داده و مهاجرت (Postgres)', icon: Database },
-    { id: 'erd', label: 'نمودار روابط داده‌ای (ERD)', icon: Layers },
-    { id: 'database', label: 'کاوشگر اطلاعات پایه', icon: Database },
-    { id: 'simulator', label: 'شبیه‌ساز چندمستأجری', icon: Terminal },
-    { id: 'tests', label: 'تست‌های اعتبارسنجی', icon: Activity },
-    { id: 'sql', label: 'کدهای اسکریپت SQL', icon: FileCode },
-  ];
-
-  const isCurrentTabInTools = systemTools.some(t => t.id === activeTab);
+  if (role === 'SUPER_ADMIN') {
+    visibleTabs = [
+      { id: 'dashboard', label: 'داشبورد مدیریتی', icon: LayoutDashboard },
+      { id: 'cooperatives', label: 'تعاونی‌ها و پروژه‌ها', icon: Layers },
+      { id: 'members', label: 'مدیران و کاربران', icon: Users },
+      { id: 'payments', label: 'امور مالی و واریزی‌ها', icon: CreditCard },
+      { id: 'logs', label: 'لاگ‌های امنیتی', icon: ShieldCheck },
+      { id: 'aiDashboard', label: 'داشبورد هوش مصنوعی', icon: Sparkles },
+      { id: 'recycleBin', label: 'سطل بازیافت', icon: Trash2 },
+      { id: 'docs', label: 'راهنمای سامانه', icon: BookOpen },
+    ];
+  } else if (role === 'COOP_ADMIN') {
+    visibleTabs = [
+      { id: 'dashboard', label: 'داشبورد تعاونی', icon: LayoutDashboard },
+      { id: 'members', label: 'اعضای تعاونی', icon: Users },
+      { id: 'units', label: 'واحدها و قراردادها', icon: Home },
+      { id: 'installments', label: 'اقساط ساختمانی', icon: CalendarDays },
+      { id: 'monthlyFees', label: 'شارژ و خدمات جاری', icon: Coins },
+      { id: 'payments', label: 'امور مالی و فیش‌ها', icon: CreditCard },
+      { id: 'logs', label: 'لاگ‌های تعاونی', icon: ShieldCheck },
+      { id: 'aiDashboard', label: 'داشبورد هوش مصنوعی', icon: Sparkles },
+      { id: 'recycleBin', label: 'سطل بازیافت', icon: Trash2 },
+      { id: 'docs', label: 'راهنمای مدیر', icon: BookOpen },
+    ];
+  } else {
+    // MEMBER
+    visibleTabs = [
+      { id: 'dashboard', label: 'کارتابل من', icon: LayoutDashboard },
+      { id: 'installments', label: 'اقساط ساختمانی من', icon: CalendarDays },
+      { id: 'monthlyFees', label: 'شارژ و هزینه‌های جاری', icon: Coins },
+      { id: 'payments', label: 'پرداخت آنلاین و فیش‌ها', icon: CreditCard },
+      { id: 'docs', label: 'راهنمای عضو', icon: BookOpen },
+    ];
+  }
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
@@ -109,18 +108,20 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenL
 
           {/* نوار وضعیت کاربر */}
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setActiveTab('supabase')}
-              className={`hidden sm:flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
-                isDbConnected
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100 shadow-xs'
-                  : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
-              }`}
-              title="مشاهده و تست اتصال پایگاه داده PostgreSQL / Supabase"
-            >
-              <Database className="w-3.5 h-3.5" />
-              <span>{isDbConnected ? 'دیتابیس: متصل به Supabase' : 'دیتابیس: تنظیم Secret'}</span>
-            </button>
+            {session?.isGlobalSuperAdmin && (
+              <button
+                onClick={() => setActiveTab('supabase')}
+                className={`hidden sm:flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
+                  isDbConnected
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100 shadow-xs'
+                    : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+                }`}
+                title="مشاهده و تست اتصال پایگاه داده PostgreSQL"
+              >
+                <Database className="w-3.5 h-3.5" />
+                <span>{isDbConnected ? 'دیتابیس: متصل' : 'دیتابیس: تنظیم Secret'}</span>
+              </button>
+            )}
 
             <div className="hidden md:flex items-center gap-2 text-xs text-slate-500 font-medium bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
               <Calendar className="w-3.5 h-3.5 text-slate-400" />
@@ -134,75 +135,25 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenL
         </div>
 
         {/* نوار ناوبری اصلی تب‌ها */}
-        <div className="flex items-center justify-between overflow-x-auto pb-2 pt-1 border-t border-slate-100 no-scrollbar gap-2">
-          
-          {/* تب‌های تجاری اصلی */}
-          <nav className="flex items-center gap-1">
-            {mainTabs.map((tab) => {
-              const isActive = activeTab === tab.id;
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`whitespace-nowrap px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 cursor-pointer flex items-center gap-2 ${
-                    isActive
-                      ? 'bg-slate-900 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-400' : 'text-slate-400'}`} />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* منوی کشویی ابزارهای فنی و دیتابیس */}
-          <div className="relative shrink-0" ref={dropdownRef}>
-            <button
-              onClick={() => setIsToolsDropdownOpen(!isToolsDropdownOpen)}
-              className={`whitespace-nowrap px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 border ${
-                isCurrentTabInTools
-                  ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
-                  : 'bg-slate-50 text-slate-600 hover:text-slate-900 border-slate-200 hover:bg-slate-100'
-              }`}
-            >
-              <Database className="w-3.5 h-3.5 text-slate-500" />
-              <span>تنظیمات پایگاه‌داده و ابزارها</span>
-              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isToolsDropdownOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {isToolsDropdownOpen && (
-              <div className="absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
-                <div className="px-3 py-2 text-[11px] font-bold text-slate-400 border-b border-slate-100">
-                  ابزارهای سیستمی و یکپارچگی داده
-                </div>
-                {systemTools.map(tool => {
-                  const ToolIcon = tool.icon;
-                  const isToolActive = activeTab === tool.id;
-                  return (
-                    <button
-                      key={tool.id}
-                      onClick={() => {
-                        setActiveTab(tool.id);
-                        setIsToolsDropdownOpen(false);
-                      }}
-                      className={`w-full text-right px-3.5 py-2.5 text-xs font-medium flex items-center gap-2.5 transition-colors ${
-                        isToolActive
-                          ? 'bg-slate-900 text-white font-bold'
-                          : 'text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      <ToolIcon className={`w-4 h-4 ${isToolActive ? 'text-emerald-400' : 'text-slate-400'}`} />
-                      <span>{tool.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
+        <div className="flex items-center justify-start overflow-x-auto pb-2 pt-1 border-t border-slate-100 no-scrollbar gap-1.5">
+          {visibleTabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`whitespace-nowrap px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 cursor-pointer flex items-center gap-2 ${
+                  isActive
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-400' : 'text-slate-400'}`} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
 
       </div>
