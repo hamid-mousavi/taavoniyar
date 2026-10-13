@@ -1,0 +1,68 @@
+# =========================================================================
+# پیکربندی کامل کانتینرهای داکر برای سامانه مسکن‌یار
+# شامل:
+#   1. postgres: پایگاه داده رابطه‌ای PostgreSQL 16 Alpine
+#   2. pgadmin: پنل گرافیکی مدیریت پایگاه داده داکر
+#   3. app: اپلیکیشن وب مسکن‌یار (Node.js Express + React Vite)
+#
+# دستورات اجرا:
+#   فقط دیتابیس: docker compose up -d postgres pgadmin
+#   کل استک:    docker compose up --build -d
+# =========================================================================
+
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: maskanyar-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-maskanyar}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-maskanyar_secret_password}
+      TZ: Asia/Tehran
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./src/db/complete_migration.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d maskanyar"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: maskanyar-pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@maskanyar.ir}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: maskanyar-web
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:maskanyar_secret_password@postgres:5432/maskanyar
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+    name: maskanyar_postgres_data

@@ -1,0 +1,6 @@
+{
+  "name": "سامانه مدیریت تعاونی‌های مسکن (مسکن‌یار)",
+  "description": "سامانه یکپارچه و چندمستأجری مدیریت تعاونی‌های مسکن، اعضا، واحدها، اقساط، پرداختی‌ها و اطلاعیه‌ها",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
