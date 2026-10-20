@@ -85,12 +85,9 @@ class DataService {
       this.monthlyFees = this.loadOrInit('monthlyFees', seedMonthlyFees);
       this.customFeeCategories = this.loadOrInit('fee_categories', []);
 
-      // پاکسازی رکوردهای دمو قدیمی در صورتی که در مرورگر باقی مانده باشد
-      if (
-        this.users.some(u => u.id === 'user-admin-coop1' || u.id === 'user-member-1' || u.id === 'user-accountant-1') ||
-        this.cooperatives.some(c => c.id === 'coop-1' || c.id === 'coop-2')
-      ) {
-        this.resetToDefaults();
+      // اگر تعاونی ثبت‌شده‌ای وجود نداشت، بارگذاری داده‌های کامل ماک برای ارائه و تست بدون دیتابیس
+      if (this.cooperatives.length === 0) {
+        this.loadPresentationMockData();
       }
 
       // اطمینان از وجود کاربر سوپر ادمین
@@ -191,7 +188,10 @@ class DataService {
     }
   }
 
-  public resetToDefaults() {
+  /**
+   * بارگذاری کامل داده‌های نمونه واقعی جهت تست و ارائه سامانه بدون نیاز به اتصال دیتابیس
+   */
+  public loadPresentationMockData() {
     this.cooperatives = [...seedCooperatives];
     this.users = [...seedUsers];
     this.memberships = [...seedMemberships];
@@ -205,19 +205,24 @@ class DataService {
     this.monthlyFees = [...seedMonthlyFees];
     this.customFeeCategories = [];
 
-    [
-      'cooperatives', 'users', 'memberships', 'units', 
-      'installmentPlans', 'installmentItems', 'payments', 
-      'receipts', 'announcements', 'auditLogs', 'monthlyFees', 'fee_categories'
-    ].forEach(k => {
-      try {
-        if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-          localStorage.removeItem(STORE_KEY_PREFIX + k);
-        }
-      } catch {}
-    });
+    this.persist('cooperatives', this.cooperatives);
+    this.persist('users', this.users);
+    this.persist('memberships', this.memberships);
+    this.persist('units', this.units);
+    this.persist('installmentPlans', this.installmentPlans);
+    this.persist('installmentItems', this.installmentItems);
+    this.persist('payments', this.payments);
+    this.persist('receipts', this.receipts);
+    this.persist('announcements', this.announcements);
+    this.persist('auditLogs', this.auditLogs);
+    this.persist('monthlyFees', this.monthlyFees);
+    this.persist('fee_categories', this.customFeeCategories);
 
     this.notifyListeners();
+  }
+
+  public resetToDefaults() {
+    this.loadPresentationMockData();
   }
 
   // ==========================================

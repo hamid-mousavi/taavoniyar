@@ -154,25 +154,79 @@ export const LoginScreen: React.FC = () => {
                 </p>
               </div>
 
-              {/* راهنمای شماره مدیر ارشد در env */}
-              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 text-right">
+              {/* حساب‌های تست و ارائه سامانه بدون نیاز به دیتابیس */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 text-right">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-800">حساب مدیر ارشد سامانه (Admin):</span>
+                  <span className="text-[11px] font-bold text-slate-800">حساب‌های آزمایشی و ارائه (کلیک برای درج):</span>
                   <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-mono font-bold">
-                    تنظیم در ENV
+                    Mock Data
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-500 leading-relaxed">
-                  برای راه‌اندازی اولیه و افزودن تعاونی‌ها و مدیران، با شماره مدیر ارشد وارد شوید:
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setMobile(adminMobile)}
-                  className="w-full py-2 px-3 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-800 text-xs font-mono font-bold transition-colors cursor-pointer flex items-center justify-between"
-                >
-                  <span className="text-slate-500 font-sans text-[11px]">انتخاب خودکار شماره ادمین:</span>
-                  <span className="text-emerald-700 font-bold">{adminMobile}</span>
-                </button>
+                <div className="grid grid-cols-1 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setMobile(adminMobile)}
+                    className={`w-full py-2 px-3 rounded-xl border text-xs font-mono transition-all cursor-pointer flex items-center justify-between text-right ${
+                      mobile === adminMobile 
+                        ? 'bg-purple-50 border-purple-300 text-purple-900 font-bold ring-1 ring-purple-200' 
+                        : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    <span className="text-[11px] font-sans flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+                      <span>مدیر ارشد سامانه (Super Admin)</span>
+                    </span>
+                    <span className="font-bold text-purple-700">{adminMobile}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMobile('09121112233')}
+                    className={`w-full py-2 px-3 rounded-xl border text-xs font-mono transition-all cursor-pointer flex items-center justify-between text-right ${
+                      mobile === '09121112233' 
+                        ? 'bg-sky-50 border-sky-300 text-sky-900 font-bold ring-1 ring-sky-200' 
+                        : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    <span className="text-[11px] font-sans flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-sky-600"></span>
+                      <span>مدیر تعاونی مسکن (مهندس تهرانی)</span>
+                    </span>
+                    <span className="font-bold text-sky-700">09121112233</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMobile('09123334455')}
+                    className={`w-full py-2 px-3 rounded-xl border text-xs font-mono transition-all cursor-pointer flex items-center justify-between text-right ${
+                      mobile === '09123334455' 
+                        ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-bold ring-1 ring-emerald-200' 
+                        : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    <span className="text-[11px] font-sans flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                      <span>عضو تعاونی - خریدار واحد ۱۲ (صادقی)</span>
+                    </span>
+                    <span className="font-bold text-emerald-700">09123334455</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMobile('09124445566')}
+                    className={`w-full py-2 px-3 rounded-xl border text-xs font-mono transition-all cursor-pointer flex items-center justify-between text-right ${
+                      mobile === '09124445566' 
+                        ? 'bg-amber-50 border-amber-300 text-amber-900 font-bold ring-1 ring-amber-200' 
+                        : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    <span className="text-[11px] font-sans flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-amber-600"></span>
+                      <span>عضو با معوقه - خریدار واحد ۲۵ (احمدی)</span>
+                    </span>
+                    <span className="font-bold text-amber-700">09124445566</span>
+                  </button>
+                </div>
               </div>
 
               <button

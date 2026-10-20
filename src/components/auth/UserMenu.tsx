@@ -6,9 +6,11 @@ import {
   ChevronDown, 
   User as UserIcon, 
   Shield, 
-  ArrowLeftRight 
+  ArrowLeftRight,
+  Sparkles
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { dataService } from '../../services/dataService';
 import { TenantSwitcherModal } from './TenantSwitcherModal';
 import { toPersianDigits } from '../../utils/persian';
 
@@ -116,6 +118,18 @@ export const UserMenu: React.FC<UserMenuProps> = ({ onOpenLogin }) => {
               >
                 <ArrowLeftRight className="w-4 h-4 text-emerald-600" />
                 <span>تغییر تعاونی / پروژه فعال</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setDropdownOpen(false);
+                  dataService.loadPresentationMockData();
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-indigo-700 hover:bg-indigo-50 rounded-xl transition-colors cursor-pointer text-right"
+                title="بارگذاری مجدد اطلاعات ماک نمونه برای ارائه"
+              >
+                <Sparkles className="w-4 h-4 text-indigo-600" />
+                <span>بارگذاری مجدد داده‌های نمونه (Mock Data)</span>
               </button>
 
               <button
